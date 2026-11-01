@@ -1,0 +1,44 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Run tests
+        shell: pwsh
+        run: python -m unittest discover -s tests -v
+
+      - name: Build release bundle
+        shell: pwsh
+        run: ./scripts/build-release.ps1 -Version "$env:GITHUB_REF_NAME"
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = $env:GITHUB_REF_NAME
+          $zip = "dist/codex-auto-supervisor-$tag.zip"
+          $sum = "dist/SHA256SUMS.txt"
+          $notes = "release-notes/$tag.md"
+          if (Test-Path -LiteralPath $notes) {
+            gh release create $tag $zip $sum --title "Codex Auto Supervisor $tag" --notes-file $notes --verify-tag
+          } else {
+            gh release create $tag $zip $sum --title "Codex Auto Supervisor $tag" --generate-notes --verify-tag
+          }
